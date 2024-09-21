@@ -6,10 +6,13 @@ defmodule DPS.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       DPSWeb.Telemetry,
       {Cluster.Supervisor,
        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {Phoenix.PubSub, name: DPS.PubSub},
+     {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
+      DPS.TopicServer.Supervisor,
       DPSWeb.Endpoint
     ]
 

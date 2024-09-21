@@ -12,10 +12,6 @@ defmodule DPSWeb.Endpoint do
          websocket: true,
          longpoll: false
 
-  # socket "/live", Phoenix.LiveView.Socket,
-  #   websocket: [connect_info: [session: @session_options]],
-  #   longpoll: [connect_info: [session: @session_options]]
-
   plug Plug.Static,
     at: "/",
     from: :dps,
