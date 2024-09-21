@@ -12,4 +12,5 @@ Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 ```
 websocat "ws://127.0.0.1:4000/socket/websocket?vsn=2.0.0"
 ["1", "1", "topics:matrix", "phx_join", {}]
+["1", "1", "topics:matrix", "publish", ["event", { "message": "red pill or blue pill?"}]]
 ```

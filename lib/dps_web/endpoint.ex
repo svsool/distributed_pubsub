@@ -9,8 +9,8 @@ defmodule DPSWeb.Endpoint do
   ]
 
   socket "/socket", DPSWeb.Socket,
-         websocket: true,
-         longpoll: false
+    websocket: true,
+    longpoll: false
 
   plug Plug.Static,
     at: "/",

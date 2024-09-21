@@ -10,22 +10,36 @@ defmodule DPS.TopicServer do
   def start_link(opts \\ []) do
     verify_opts(opts)
 
-    GenServer.start_link(__MODULE__, %{
-      topic: opts[:topic],
-      pids: MapSet.new()
-    }, name: :"DPS.TopicServer.#{opts[:topic]}")
+    GenServer.start_link(
+      __MODULE__,
+      %{
+        topic: opts[:topic],
+        pids: MapSet.new()
+      },
+      name: :"DPS.TopicServer.#{opts[:topic]}"
+    )
   end
 
   def init(state) do
     {:ok, state}
   end
 
-  def handle_cast({:join, pid}, state) do
-    Process.monitor(pid)
+  def handle_cast({:join, channel_pid, topic_client_worker_pid}, state) do
+    Process.monitor(channel_pid)
 
-    IO.puts("Joined #{inspect(pid)} to #{inspect(state.topic)}")
+    IO.puts("Joined channel_pid: #{inspect(channel_pid)}, topic_client_worker_pid: #{inspect(topic_client_worker_pid)} to #{inspect(state.topic)}")
 
-    {:noreply, %{state | pids: MapSet.put(state.pids, pid)}}
+    {:noreply, %{state | pids: MapSet.put(state.pids, topic_client_worker_pid)}}
+  end
+
+  def handle_cast({:publish, event, payload}, state) do
+    IO.puts("Published #{inspect(event)} #{inspect(payload)} to #{inspect(state.topic)}")
+
+    for pid <- state.pids do
+      GenServer.cast(pid, {:publish, state.topic, event, payload})
+    end
+
+    {:noreply, state}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
@@ -39,7 +53,7 @@ end
 defmodule DPS.TopicServer.Supervisor do
   use Supervisor
 
-  @pool_size 1
+  @shards_number 1
 
   def start_link(opts) do
     Supervisor.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -48,8 +62,10 @@ defmodule DPS.TopicServer.Supervisor do
   @impl true
   def init(opts) do
     children =
-      for shard <- 1..@pool_size do
-        Supervisor.child_spec({DPS.TopicServer.Worker, [shard: shard]}, id: "DPS.TopicServer.Supervisor.#{shard}")
+      for shard <- 0..(@shards_number - 1) do
+        Supervisor.child_spec({DPS.TopicServer.Worker, [shard: shard]},
+          id: "DPS.TopicServer.Supervisor.#{shard}"
+        )
       end
 
     Supervisor.init(children, strategy: :one_for_one)
@@ -61,11 +77,11 @@ defmodule DPS.TopicServer.Utils do
 
   @group "topic_servers"
 
-  def resolve_topic_worker_pid(topic)  do
+  def resolve_topic_server_worker_pid(topic) do
     # TODO: select topic's pid properly by node name and use consistent hashing
     [pid] = :pg.get_members(DPS.PG, @group)
 
-     pid
+    pid
   end
 
   def join(pid) do
@@ -77,7 +93,7 @@ defmodule DPS.TopicServer.Worker do
   @moduledoc false
   use GenServer
 
-  import DPS.TopicServer.Utils
+  import DPS.TopicServer
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, [], name: :"DPS.TopicServer.Worker.#{opts[:shard]}")
@@ -93,21 +109,34 @@ defmodule DPS.TopicServer.Worker do
   def ensure_topic_server_started(topic) do
     case GenServer.whereis(:"DPS.TopicServer.#{topic}") do
       nil ->
-        {:ok, pid} = DynamicSupervisor.start_child(DPS.TopicServer.DynamicSupervisor, {DPS.TopicServer, [topic: topic]})
+        {:ok, pid} =
+          DynamicSupervisor.start_child(
+            DPS.TopicServer.DynamicSupervisor,
+            {DPS.TopicServer, [topic: topic]}
+          )
+
         pid
-      pid -> pid
+
+      pid ->
+        pid
     end
   end
 
   @impl true
-  def handle_cast({:join, topic, pid}, state) do
+  def handle_cast({:join, topic, channel_pid, topic_client_worker_pid}, state) do
     topic_server_pid = ensure_topic_server_started(topic)
 
-    :ok = GenServer.cast(topic_server_pid, {:join, pid})
+    :ok = GenServer.cast(topic_server_pid, {:join, channel_pid, topic_client_worker_pid})
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:publish, topic, event, payload}, state) do
+    topic_server_pid = ensure_topic_server_started(topic)
+
+    :ok = GenServer.cast(topic_server_pid, {:publish, event, payload})
 
     {:noreply, state}
   end
 end
-
-
-

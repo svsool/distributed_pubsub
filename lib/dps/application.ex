@@ -11,7 +11,8 @@ defmodule DPS.Application do
       {Cluster.Supervisor,
        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {Phoenix.PubSub, name: DPS.PubSub},
-     {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
+      {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
+      DPS.TopicClient.Supervisor,
       DPS.TopicServer.Supervisor,
       DPSWeb.Endpoint
     ]
