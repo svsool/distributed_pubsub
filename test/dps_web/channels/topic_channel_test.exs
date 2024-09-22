@@ -16,13 +16,17 @@ defmodule DPSWeb.TopicChanelTest do
       |> socket("user:1", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
 
-    ref = push(socket, "publish", ["event", %{ "message" => "red pill or blue pill?" }])
+    ref = push(socket, "publish", ["event", %{"message" => "red pill or blue pill?"}])
 
     assert_reply ref, :ok
 
-    assert_broadcast "event", %{ "message" => "red pill or blue pill?" }
+    assert_broadcast "event", %{"message" => "red pill or blue pill?"}
 
-    assert_receive %Phoenix.Socket.Message{topic: "topics:matrix", event: "event", payload: %{ "message" => "red pill or blue pill?" }}
+    assert_receive %Phoenix.Socket.Message{
+      topic: "topics:matrix",
+      event: "event",
+      payload: %{"message" => "red pill or blue pill?"}
+    }
   end
 
   test "multiple clients should receive the event" do
@@ -36,9 +40,18 @@ defmodule DPSWeb.TopicChanelTest do
       |> socket("user:2", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
 
-    ref = push(socket1, "publish", ["event", %{ "message" => "red pill or blue pill?" }])
+    push(socket1, "publish", ["event", %{"message" => "red pill or blue pill?"}])
 
-    assert_receive %Phoenix.Socket.Message{topic: "topics:matrix", event: "event", payload: %{ "message" => "red pill or blue pill?" }}
-    assert_receive %Phoenix.Socket.Message{topic: "topics:matrix", event: "event", payload: %{ "message" => "red pill or blue pill?" }}
+    assert_receive %Phoenix.Socket.Message{
+      topic: "topics:matrix",
+      event: "event",
+      payload: %{"message" => "red pill or blue pill?"}
+    }
+
+    assert_receive %Phoenix.Socket.Message{
+      topic: "topics:matrix",
+      event: "event",
+      payload: %{"message" => "red pill or blue pill?"}
+    }
   end
 end
