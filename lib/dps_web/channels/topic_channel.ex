@@ -8,43 +8,80 @@ defmodule DPSWeb.TopicsChannel do
 
   @impl true
   def join(topic, payload, socket) do
-    IO.inspect(["join topic in topics channel", topic, payload])
-
     topic_client_worker_pid = resolve_topic_client_worker_pid(topic)
     topic_server_worker_pid = resolve_topic_server_worker_pid(topic)
 
-    IO.inspect([
-      "channel_pid",
-      self(),
-      "topic_server_worker_pid",
-      topic_server_worker_pid,
-      "topic_client_worker_pid",
-      topic_client_worker_pid
-    ])
+    start = System.monotonic_time()
 
-    :ok = GenServer.cast(topic_server_worker_pid, {:join, topic, self(), topic_client_worker_pid})
+    topic_channel_pid = self()
+
+    :ok =
+      GenServer.cast(
+        topic_server_worker_pid,
+        {:join, topic, topic_channel_pid, topic_client_worker_pid}
+      )
+
+    duration = System.monotonic_time() - start
+
+    :telemetry.execute(
+      [:dps, :topic_channel, :join],
+      %{duration: duration},
+      %{
+        socket_id: socket.id,
+        topic: topic,
+        payload: payload,
+        topic_channel_pid: topic_channel_pid,
+        topic_client_worker_pid: topic_client_worker_pid,
+        topic_server_worker_pid: topic_server_worker_pid
+      }
+    )
 
     {:ok, socket}
   end
 
   @impl true
   def handle_in("publish", [event, payload], socket) do
-    IO.inspect(["publish topic in topics channel", socket.topic, payload])
-
     topic_server_worker_pid = resolve_topic_server_worker_pid(socket.topic)
 
+    start = System.monotonic_time()
+
     :ok = GenServer.cast(topic_server_worker_pid, {:publish, socket.topic, event, payload})
+
+    duration = System.monotonic_time() - start
+
+    :telemetry.execute(
+      [:dps, :topic_channel, :publish],
+      %{duration: duration},
+      %{
+        socket_id: socket.id,
+        topic: socket.topic,
+        event: event,
+        payload: payload,
+        topic_server_worker_pid: topic_server_worker_pid
+      }
+    )
 
     {:noreply, socket}
   end
 
-  def handle_out("event", payload, socket) do
-    IO.inspect([
-      "sending outgoing event #{inspect(payload)} in topic #{socket.topic} to socket #{socket.id}",
-      payload
-    ])
+  @impl true
+  def handle_out(event, payload, socket) do
+    start = System.monotonic_time()
 
-    push(socket, "event", payload)
+    :ok = push(socket, "event", payload)
+
+    duration = System.monotonic_time() - start
+
+    :telemetry.execute(
+      [:dps, :topics_channel, :handle_out],
+      %{duration: duration},
+      %{
+        socket_id: socket.id,
+        topic: socket.topic,
+        event: event,
+        payload: payload
+      }
+    )
 
     {:noreply, socket}
   end

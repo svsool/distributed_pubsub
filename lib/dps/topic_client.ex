@@ -49,7 +49,21 @@ defmodule DPS.TopicClient.Worker do
 
   @impl true
   def handle_cast({:publish, topic, event, payload}, state) do
-    DPSWeb.Endpoint.local_broadcast(topic, event, payload)
+    start = System.monotonic_time()
+
+    :ok = DPSWeb.Endpoint.local_broadcast(topic, event, payload)
+
+    duration = System.monotonic_time() - start
+
+    :telemetry.execute(
+      [:dps, :topic_client, :publish],
+      %{duration: duration},
+      %{
+        topic: topic,
+        event: event,
+        payload: payload
+      }
+    )
 
     {:noreply, state}
   end

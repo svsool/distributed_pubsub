@@ -25,27 +25,53 @@ defmodule DPS.TopicServer do
   end
 
   def handle_cast({:join, channel_pid, topic_client_worker_pid}, state) do
-    Process.monitor(channel_pid)
-
-    IO.puts(
-      "Joined channel_pid: #{inspect(channel_pid)}, topic_client_worker_pid: #{inspect(topic_client_worker_pid)} to #{inspect(state.topic)}"
+    :telemetry.execute(
+      [:dps, :topic_server, :join],
+      %{},
+      %{
+        topic: state.topic,
+        channel_pid: channel_pid,
+        topic_client_worker_pid: topic_client_worker_pid
+      }
     )
+
+    Process.monitor(channel_pid)
 
     {:noreply, %{state | pids: MapSet.put(state.pids, topic_client_worker_pid)}}
   end
 
   def handle_cast({:publish, event, payload}, state) do
-    IO.puts("Published #{inspect(event)} #{inspect(payload)} to #{inspect(state.topic)}")
+    start = System.monotonic_time(:millisecond)
 
     for pid <- state.pids do
       GenServer.cast(pid, {:publish, state.topic, event, payload})
     end
 
+    duration = System.monotonic_time(:millisecond) - start
+
+    :telemetry.execute(
+      [:dps, :topic_server, :publish],
+      %{},
+      %{
+        topic: state.topic,
+        event: event,
+        payload: payload,
+        duration: duration
+      }
+    )
+
     {:noreply, state}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
-    IO.puts("Left #{inspect(pid)} from #{inspect(state.topic)}")
+    :telemetry.execute(
+      [:dps, :topic_server, :leave],
+      %{},
+      %{
+        topic: state.topic,
+        pid: pid
+      }
+    )
 
     # handle leaves automatically
     {:noreply, %{state | pids: MapSet.delete(state.pids, pid)}}
