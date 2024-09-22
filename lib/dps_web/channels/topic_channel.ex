@@ -1,4 +1,4 @@
-defmodule DPSWeb.TopicsChannel do
+defmodule DPSWeb.TopicChannel do
   use DPSWeb, :channel
 
   import DPS.TopicClient
@@ -61,7 +61,7 @@ defmodule DPSWeb.TopicsChannel do
       }
     )
 
-    {:noreply, socket}
+    {:reply, :ok, socket}
   end
 
   @impl true
