@@ -73,7 +73,7 @@ defmodule DPSWeb.TopicsChannel do
     duration = System.monotonic_time() - start
 
     :telemetry.execute(
-      [:dps, :topics_channel, :handle_out],
+      [:dps, :topic_channel, :handle_out],
       %{duration: duration},
       %{
         socket_id: socket.id,
