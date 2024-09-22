@@ -18,6 +18,10 @@ defmodule DPSWeb.Telemetry.Logger do
     :telemetry.attach_many(
       __MODULE__,
       [
+        [:libcluster, :connect_node, :ok],
+        [:libcluster, :connect_node, :error],
+        [:libcluster, :disconnect_node, :ok],
+        [:libcluster, :disconnect_node, :error],
         [:dps, :socket, :connect],
         [:dps, :topic_server, :join],
         [:dps, :topic_server, :publish],
