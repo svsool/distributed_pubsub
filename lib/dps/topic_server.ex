@@ -27,7 +27,9 @@ defmodule DPS.TopicServer do
   def handle_cast({:join, channel_pid, topic_client_worker_pid}, state) do
     Process.monitor(channel_pid)
 
-    IO.puts("Joined channel_pid: #{inspect(channel_pid)}, topic_client_worker_pid: #{inspect(topic_client_worker_pid)} to #{inspect(state.topic)}")
+    IO.puts(
+      "Joined channel_pid: #{inspect(channel_pid)}, topic_client_worker_pid: #{inspect(topic_client_worker_pid)} to #{inspect(state.topic)}"
+    )
 
     {:noreply, %{state | pids: MapSet.put(state.pids, topic_client_worker_pid)}}
   end
@@ -93,7 +95,7 @@ defmodule DPS.TopicServer.Worker do
   @moduledoc false
   use GenServer
 
-  import DPS.TopicServer
+  import DPS.TopicServer.Utils
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, [], name: :"DPS.TopicServer.Worker.#{opts[:shard]}")
