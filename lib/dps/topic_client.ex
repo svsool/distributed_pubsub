@@ -1,12 +1,10 @@
-defmodule DPS.TopicClient do
+defmodule DPS.TopicClient.Utils do
   @moduledoc false
 
-  @shards_number 1
-
-  def shards_number, do: @shards_number
+  def shards_number, do: Application.get_env(:dps, DPS.TopicClient)[:shards_number]
 
   def resolve_topic_client_worker_pid(topic) do
-    shard = :erlang.phash2(topic, @shards_number)
+    shard = :erlang.phash2(topic, shards_number())
 
     GenServer.whereis(:"DPS.TopicClient.Worker.#{shard}")
   end
@@ -15,7 +13,7 @@ end
 defmodule DPS.TopicClient.Supervisor do
   use Supervisor
 
-  import DPS.TopicClient
+  import DPS.TopicClient.Utils
 
   def start_link(opts) do
     Supervisor.start_link(__MODULE__, %{}, name: __MODULE__)

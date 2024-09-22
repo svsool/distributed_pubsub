@@ -7,9 +7,19 @@
 # General application configuration
 import Config
 
+schedulers_online = System.schedulers_online()
+
 config :dps,
   namespace: DPS,
   generators: [timestamp_type: :utc_datetime]
+
+config :dps, DPS.TopicClient,
+  # should be same across whole fleet
+  shards_number: schedulers_online
+
+config :dps, DPS.TopicServer,
+  # should be same across whole fleet
+  shards_number: schedulers_online
 
 # Configures the endpoint
 config :dps, DPSWeb.Endpoint,

@@ -3,11 +3,14 @@ defmodule DPS.Application do
 
   use Application
 
+  alias ExHashRing.Ring
+
   @impl true
   def start(_type, _args) do
     children = [
       %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       DPSWeb.Telemetry,
+      {ExHashRing.Ring, name: DPS.Ring},
       {Cluster.Supervisor,
        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {Phoenix.PubSub, name: DPS.PubSub},
@@ -19,7 +22,12 @@ defmodule DPS.Application do
 
     opts = [strategy: :one_for_one, name: DPS.Supervisor]
 
-    Supervisor.start_link(children, opts)
+    {:ok, _pid} = result = Supervisor.start_link(children, opts)
+
+    # TODO: allow nodes configuration based on env vars
+    {:ok, _} = Ring.add_node(DPS.Ring, node())
+
+    result
   end
 
   @impl true

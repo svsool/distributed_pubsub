@@ -33,7 +33,8 @@ defmodule DPS.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
-      {:libcluster, "~> 3.4.1"}
+      {:libcluster, "~> 3.4.1"},
+      {:ex_hash_ring, "~> 6.0"}
     ]
   end
 

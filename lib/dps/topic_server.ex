@@ -1,13 +1,26 @@
 defmodule DPS.TopicServer.Utils do
   @moduledoc false
 
+  alias ExHashRing.Ring
+
   @group "topic_servers"
 
-  def resolve_topic_server_worker_pid(topic) do
-    # TODO: select topic's pid properly by node name and use consistent hashing
-    [pid] = :pg.get_members(DPS.PG, @group)
+  def shards_number, do: Application.get_env(:dps, DPS.TopicServer)[:shards_number]
 
-    pid
+  def resolve_topic_server_worker_pid(topic) do
+    {:ok, node_name} = Ring.find_node(DPS.Ring, topic)
+
+    members = :pg.get_members(DPS.PG, @group)
+
+    topic_server_worker_pids = members |> Enum.filter(&(node(&1) == node_name))
+
+    pid_index = case length(topic_server_worker_pids) do
+      1 -> 0
+      len when len > 1 -> :rand.uniform(len - 1)
+    end
+
+    # round-robin selection across available topic server workers
+    topic_server_worker_pids |> Enum.at(pid_index)
   end
 
   def join(pid) do
@@ -110,7 +123,7 @@ end
 defmodule DPS.TopicServer.Supervisor do
   use Supervisor
 
-  @shards_number 1
+  import DPS.TopicServer.Utils
 
   def start_link(opts) do
     Supervisor.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -119,7 +132,7 @@ defmodule DPS.TopicServer.Supervisor do
   @impl true
   def init(opts) do
     children =
-      for shard <- 0..(@shards_number - 1) do
+      for shard <- 0..(shards_number() - 1) do
         Supervisor.child_spec({DPS.TopicServer.Worker, [shard: shard]},
           id: "DPS.TopicServer.Supervisor.#{shard}"
         )

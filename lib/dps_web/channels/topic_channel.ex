@@ -1,7 +1,7 @@
 defmodule DPSWeb.TopicChannel do
   use Phoenix.Channel, log_join: false, log_handle_in: false
 
-  import DPS.TopicClient
+  import DPS.TopicClient.Utils
   import DPS.TopicServer.Utils
 
   intercept ["event"]
