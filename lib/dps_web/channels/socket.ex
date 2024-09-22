@@ -1,5 +1,5 @@
 defmodule DPSWeb.Socket do
-  use Phoenix.Socket
+  use Phoenix.Socket, log: false
 
   channel("topics:*", DPSWeb.TopicChannel)
 
@@ -8,6 +8,10 @@ defmodule DPSWeb.Socket do
 
   @impl true
   def connect(_params, socket, _connect_info) do
-    {:ok, socket |> assign(:id, System.unique_integer([:positive]))}
+    socket_id = System.unique_integer([:positive])
+
+    :telemetry.execute([:dps, :socket, :connect], %{}, %{socket_id: socket_id})
+
+    {:ok, socket |> assign(:id, socket_id)}
   end
 end

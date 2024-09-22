@@ -18,6 +18,7 @@ defmodule DPSWeb.Telemetry.Logger do
     :telemetry.attach_many(
       __MODULE__,
       [
+        [:dps, :socket, :connect],
         [:dps, :topic_server, :join],
         [:dps, :topic_server, :publish],
         [:dps, :topic_server, :leave],
