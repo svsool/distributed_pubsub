@@ -1,5 +1,24 @@
+defmodule DPS.TopicServer.Utils do
+  @moduledoc false
+
+  @group "topic_servers"
+
+  def resolve_topic_server_worker_pid(topic) do
+    # TODO: select topic's pid properly by node name and use consistent hashing
+    [pid] = :pg.get_members(DPS.PG, @group)
+
+    pid
+  end
+
+  def join(pid) do
+    :ok = :pg.join(DPS.PG, @group, pid)
+  end
+end
+
 defmodule DPS.TopicServer do
   use GenServer
+
+  import DPS.TopicServer.Utils
 
   def verify_opts!(opts) do
     if opts[:topic] == nil do
@@ -18,6 +37,12 @@ defmodule DPS.TopicServer do
       },
       name: :"DPS.TopicServer.#{opts[:topic]}"
     )
+  end
+
+  def pids(topic) do
+    topic_server_pid = resolve_topic_server_worker_pid(topic)
+
+    GenServer.call(topic_server_pid, {:pids, topic})
   end
 
   def init(state) do
@@ -63,6 +88,10 @@ defmodule DPS.TopicServer do
     {:noreply, state}
   end
 
+  def handle_call(:pids, _from, state) do
+    {:reply, MapSet.to_list(state.pids), state}
+  end
+
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
     :telemetry.execute(
       [:dps, :topic_server, :leave],
@@ -97,23 +126,6 @@ defmodule DPS.TopicServer.Supervisor do
       end
 
     Supervisor.init(children, strategy: :one_for_one)
-  end
-end
-
-defmodule DPS.TopicServer.Utils do
-  @moduledoc false
-
-  @group "topic_servers"
-
-  def resolve_topic_server_worker_pid(topic) do
-    # TODO: select topic's pid properly by node name and use consistent hashing
-    [pid] = :pg.get_members(DPS.PG, @group)
-
-    pid
-  end
-
-  def join(pid) do
-    :ok = :pg.join(DPS.PG, @group, pid)
   end
 end
 
@@ -166,5 +178,14 @@ defmodule DPS.TopicServer.Worker do
     :ok = GenServer.cast(topic_server_pid, {:publish, event, payload})
 
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_call({:pids, topic}, _from, state) do
+    topic_server_pid = ensure_topic_server_started(topic)
+
+    result = GenServer.call(topic_server_pid, :pids)
+
+    {:reply, result, state}
   end
 end
