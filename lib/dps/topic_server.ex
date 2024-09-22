@@ -1,14 +1,14 @@
 defmodule DPS.TopicServer do
   use GenServer
 
-  def verify_opts(opts) do
+  def verify_opts!(opts) do
     if opts[:topic] == nil do
       raise ArgumentError, "Topic is required"
     end
   end
 
   def start_link(opts \\ []) do
-    verify_opts(opts)
+    verify_opts!(opts)
 
     GenServer.start_link(
       __MODULE__,
