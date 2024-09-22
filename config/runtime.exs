@@ -1,5 +1,13 @@
 import Config
 
+apps = %{
+  "ws" => :ws,
+  "ts" => :ts
+}
+
+config :dps,
+  app: Map.get(apps, System.get_env("DPS_APP"), :all)
+
 if System.get_env("PHX_SERVER") do
   config :dps, DPSWeb.Endpoint, server: true
 end
