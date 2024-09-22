@@ -13,7 +13,14 @@ defmodule DPSWeb.TopicsChannel do
     topic_client_worker_pid = resolve_topic_client_worker_pid(topic)
     topic_server_worker_pid = resolve_topic_server_worker_pid(topic)
 
-    IO.inspect(["channel_pid", self(), "topic_server_worker_pid", topic_server_worker_pid, "topic_client_worker_pid", topic_client_worker_pid])
+    IO.inspect([
+      "channel_pid",
+      self(),
+      "topic_server_worker_pid",
+      topic_server_worker_pid,
+      "topic_client_worker_pid",
+      topic_client_worker_pid
+    ])
 
     :ok = GenServer.cast(topic_server_worker_pid, {:join, topic, self(), topic_client_worker_pid})
 
@@ -32,7 +39,10 @@ defmodule DPSWeb.TopicsChannel do
   end
 
   def handle_out("event", payload, socket) do
-    IO.inspect(["sending outgoing event #{inspect(payload)} in topic #{socket.topic} to socket #{socket.id}", payload])
+    IO.inspect([
+      "sending outgoing event #{inspect(payload)} in topic #{socket.topic} to socket #{socket.id}",
+      payload
+    ])
 
     push(socket, "event", payload)
 
