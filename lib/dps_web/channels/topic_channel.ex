@@ -9,7 +9,7 @@ defmodule DPSWeb.TopicChannel do
   @impl true
   def join(topic, payload, socket) do
     topic_client_worker_pid = resolve_topic_client_worker_pid(topic)
-    topic_server_worker_pid = resolve_topic_server_worker_pid(topic)
+    {:ok, topic_server_worker_pid} = resolve_topic_server_worker_pid(topic)
 
     start = System.monotonic_time()
 
@@ -41,7 +41,7 @@ defmodule DPSWeb.TopicChannel do
 
   @impl true
   def handle_in("publish", [event, payload], socket) do
-    topic_server_worker_pid = resolve_topic_server_worker_pid(socket.topic)
+    {:ok, topic_server_worker_pid} = resolve_topic_server_worker_pid(socket.topic)
 
     start = System.monotonic_time()
 

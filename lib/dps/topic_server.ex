@@ -14,13 +14,27 @@ defmodule DPS.TopicServer.Utils do
 
     topic_server_worker_pids = members |> Enum.filter(&(node(&1) == node_name))
 
-    pid_index = case length(topic_server_worker_pids) do
-      1 -> 0
-      len when len > 1 -> :rand.uniform(len - 1)
+    if length(topic_server_worker_pids) > 0 do
+      pid_index =
+        case length(topic_server_worker_pids) do
+          1 -> 0
+          len when len > 1 -> :rand.uniform(len - 1)
+        end
+
+      # TODO: do in a round-robin fashion e.g. based on load
+      # route to a random topic server worker for now
+      pid = topic_server_worker_pids |> Enum.at(pid_index)
+
+      if pid == nil do
+        {:error}
+      else
+        {:ok, pid}
+      end
+    else
+      {:error}
     end
 
-    # round-robin selection across available topic server workers
-    topic_server_worker_pids |> Enum.at(pid_index)
+
   end
 
   def join(pid) do
@@ -53,7 +67,7 @@ defmodule DPS.TopicServer do
   end
 
   def pids(topic) do
-    topic_server_pid = resolve_topic_server_worker_pid(topic)
+    {:ok, topic_server_pid} = resolve_topic_server_worker_pid(topic)
 
     GenServer.call(topic_server_pid, {:pids, topic})
   end
@@ -162,13 +176,20 @@ defmodule DPS.TopicServer.Worker do
   def ensure_topic_server_started(topic) do
     case GenServer.whereis(:"DPS.TopicServer.#{topic}") do
       nil ->
-        {:ok, pid} =
+        result =
           DynamicSupervisor.start_child(
             DPS.TopicServer.DynamicSupervisor,
             {DPS.TopicServer, [topic: topic]}
           )
 
-        pid
+        case result do
+          {:ok, pid} ->
+            pid
+
+          # can happen with concurrent requests, when branch visited by multiple workers
+          {:error, {:already_started, pid}} ->
+            pid
+        end
 
       pid ->
         pid

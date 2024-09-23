@@ -13,11 +13,11 @@ defmodule DPS.Application do
   # start only websocket server
   def do_start(:ws) do
     children = [
-      %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       DPSWeb.Telemetry,
+      %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       {ExHashRing.Ring, name: DPS.Ring},
       {Cluster.Supervisor,
-        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
+       [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {Phoenix.PubSub, name: DPS.PubSub},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
       DPS.TopicClient.Supervisor,
@@ -28,8 +28,16 @@ defmodule DPS.Application do
 
     {:ok, _pid} = result = Supervisor.start_link(children, opts)
 
-    # TODO: allow nodes configuration based on env vars
-    {:ok, _} = Ring.add_node(DPS.Ring, node())
+    nodes = Application.get_env(:dps, DPS.TopicServer)[:nodes]
+
+    unless nodes do
+      raise "No nodes configured for the topic server"
+    end
+
+    {:ok, _} = Ring.add_nodes(DPS.Ring, nodes |> Enum.map(&String.to_atom/1))
+
+    # joins topics server process group
+    DPS.TopicServer.Utils.join(self())
 
     result
   end
@@ -37,10 +45,10 @@ defmodule DPS.Application do
   # start only topic server
   def do_start(:ts) do
     children = [
-      %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       DPSWeb.Telemetry,
+      %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       {Cluster.Supervisor,
-        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
+       [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
       DPS.TopicServer.Supervisor
     ]
@@ -54,11 +62,11 @@ defmodule DPS.Application do
 
   def do_start(:all) do
     children = [
-      %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       DPSWeb.Telemetry,
+      %{id: :pg, start: {:pg, :start_link, [DPS.PG]}},
       {ExHashRing.Ring, name: DPS.Ring},
       {Cluster.Supervisor,
-        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
+       [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {Phoenix.PubSub, name: DPS.PubSub},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
       DPS.TopicClient.Supervisor,
@@ -70,8 +78,13 @@ defmodule DPS.Application do
 
     {:ok, _pid} = result = Supervisor.start_link(children, opts)
 
-    # TODO: allow nodes configuration based on env vars
-    {:ok, _} = Ring.add_node(DPS.Ring, node())
+    nodes = Application.get_env(:dps, DPS.TopicServer)[:nodes]
+
+    unless nodes do
+      raise "No nodes configured for the topic server"
+    end
+
+    {:ok, _} = Ring.add_nodes(DPS.Ring, nodes |> Enum.map(&String.to_atom/1))
 
     result
   end

@@ -8,6 +8,10 @@ config :dps, DPSWeb.Endpoint,
   secret_key_base: "/C2+I8FuGmAHq+MfX1wGFmmBhDavp6xhBDD7W2rx1vzSYVWjsc+Qow54KOp+Z2eL",
   watchers: []
 
+{:ok, hostname} = :inet.gethostname()
+
+config :dps, DPS.TopicServer, nodes: ["dps-ts-a@#{hostname}", "dps-ts-b@#{hostname}"]
+
 config :libcluster,
   # debug: true,
   topologies: [

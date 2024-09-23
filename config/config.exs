@@ -10,6 +10,7 @@ import Config
 schedulers_online = System.schedulers_online()
 
 config :dps,
+  env: config_env(),
   namespace: DPS,
   generators: [timestamp_type: :utc_datetime]
 
