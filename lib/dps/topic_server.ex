@@ -33,8 +33,6 @@ defmodule DPS.TopicServer.Utils do
     else
       {:error}
     end
-
-
   end
 
   def join(pid) do
