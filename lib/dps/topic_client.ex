@@ -45,8 +45,9 @@ defmodule DPS.TopicClient.Worker do
     {:ok, %{}}
   end
 
+  # send() can be used as well for perf reasons to avoid GenServer overhead
   @impl true
-  def handle_cast({:publish, topic, event, payload}, state) do
+  def handle_call({:publish, topic, event, payload}, _from, state) do
     start = System.monotonic_time()
 
     :ok = DPSWeb.Endpoint.local_broadcast(topic, event, payload)
@@ -63,6 +64,6 @@ defmodule DPS.TopicClient.Worker do
       }
     )
 
-    {:noreply, state}
+    {:reply, :ok, state}
   end
 end

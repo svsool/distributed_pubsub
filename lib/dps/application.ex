@@ -36,7 +36,6 @@ defmodule DPS.Application do
 
     {:ok, _} = Ring.add_nodes(DPS.Ring, nodes |> Enum.map(&String.to_atom/1))
 
-    # joins topics server process group
     DPS.TopicServer.Utils.join(self())
 
     result

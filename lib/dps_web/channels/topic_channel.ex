@@ -16,7 +16,7 @@ defmodule DPSWeb.TopicChannel do
     topic_channel_pid = self()
 
     :ok =
-      GenServer.cast(
+      GenServer.call(
         topic_server_worker_pid,
         {:join, topic, topic_channel_pid, topic_client_worker_pid}
       )
@@ -45,7 +45,7 @@ defmodule DPSWeb.TopicChannel do
 
     start = System.monotonic_time()
 
-    :ok = GenServer.cast(topic_server_worker_pid, {:publish, socket.topic, event, payload})
+    :ok = GenServer.call(topic_server_worker_pid, {:publish, socket.topic, event, payload})
 
     duration = System.monotonic_time() - start
 

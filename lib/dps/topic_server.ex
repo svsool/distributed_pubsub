@@ -58,23 +58,23 @@ defmodule DPS.TopicServer do
       __MODULE__,
       %{
         topic: opts[:topic],
-        pids: MapSet.new()
+        subscribers: MapSet.new()
       },
       name: :"DPS.TopicServer.#{opts[:topic]}"
     )
   end
 
-  def pids(topic) do
+  def subscribers(topic) do
     {:ok, topic_server_pid} = resolve_topic_server_worker_pid(topic)
 
-    GenServer.call(topic_server_pid, {:pids, topic})
+    GenServer.call(topic_server_pid, {:subscribers, topic})
   end
 
   def init(state) do
     {:ok, state}
   end
 
-  def handle_cast({:join, channel_pid, topic_client_worker_pid}, state) do
+  def handle_call({:join, channel_pid, topic_client_worker_pid}, _from, state) do
     :telemetry.execute(
       [:dps, :topic_server, :join],
       %{},
@@ -87,14 +87,22 @@ defmodule DPS.TopicServer do
 
     Process.monitor(channel_pid)
 
-    {:noreply, %{state | pids: MapSet.put(state.pids, topic_client_worker_pid)}}
+    {:reply, :ok,
+     %{
+       state
+       | subscribers:
+           MapSet.put(state.subscribers, %{
+             channel_pid: channel_pid,
+             topic_client_worker_pid: topic_client_worker_pid
+           })
+     }}
   end
 
-  def handle_cast({:publish, event, payload}, state) do
+  def handle_call({:publish, event, payload}, _from, state) do
     start = System.monotonic_time(:millisecond)
 
-    for pid <- state.pids do
-      GenServer.cast(pid, {:publish, state.topic, event, payload})
+    for %{topic_client_worker_pid: topic_client_worker_pid} <- state.subscribers do
+      :ok = GenServer.call(topic_client_worker_pid, {:publish, state.topic, event, payload})
     end
 
     duration = System.monotonic_time(:millisecond) - start
@@ -110,11 +118,11 @@ defmodule DPS.TopicServer do
       }
     )
 
-    {:noreply, state}
+    {:reply, :ok, state}
   end
 
-  def handle_call(:pids, _from, state) do
-    {:reply, MapSet.to_list(state.pids), state}
+  def handle_call(:subscribers, _from, state) do
+    {:reply, MapSet.to_list(state.subscribers), state}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
@@ -128,7 +136,14 @@ defmodule DPS.TopicServer do
     )
 
     # handle leaves automatically
-    {:noreply, %{state | pids: MapSet.delete(state.pids, pid)}}
+    {:noreply,
+     %{
+       state
+       | subscribers:
+           MapSet.reject(state.subscribers, fn %{channel_pid: channel_pid} ->
+             channel_pid == pid
+           end)
+     }}
   end
 end
 
@@ -195,28 +210,29 @@ defmodule DPS.TopicServer.Worker do
   end
 
   @impl true
-  def handle_cast({:join, topic, channel_pid, topic_client_worker_pid}, state) do
+  def handle_call({:join, topic, channel_pid, topic_client_worker_pid}, _from, state) do
     topic_server_pid = ensure_topic_server_started(topic)
 
-    :ok = GenServer.cast(topic_server_pid, {:join, channel_pid, topic_client_worker_pid})
+    result = GenServer.call(topic_server_pid, {:join, channel_pid, topic_client_worker_pid})
 
-    {:noreply, state}
+    {:reply, result, state}
+  end
+
+  # send() can be used as well for perf reasons to avoid GenServer overhead
+  @impl true
+  def handle_call({:publish, topic, event, payload}, _from, state) do
+    topic_server_pid = ensure_topic_server_started(topic)
+
+    result = GenServer.call(topic_server_pid, {:publish, event, payload})
+
+    {:reply, result, state}
   end
 
   @impl true
-  def handle_cast({:publish, topic, event, payload}, state) do
+  def handle_call({:subscribers, topic}, _from, state) do
     topic_server_pid = ensure_topic_server_started(topic)
 
-    :ok = GenServer.cast(topic_server_pid, {:publish, event, payload})
-
-    {:noreply, state}
-  end
-
-  @impl true
-  def handle_call({:pids, topic}, _from, state) do
-    topic_server_pid = ensure_topic_server_started(topic)
-
-    result = GenServer.call(topic_server_pid, :pids)
+    result = GenServer.call(topic_server_pid, :subscribers)
 
     {:reply, result, state}
   end

@@ -4,15 +4,18 @@ defmodule DPSWeb.TopicChanelTest do
   alias DPS.TopicServer
 
   test "client should join topics:matrix" do
-    {result, _, socket} =
+    {:ok, _, socket} =
       DPSWeb.Socket
       |> socket("user:1", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
 
-    pids = TopicServer.pids("topics:matrix")
+    subscribers = TopicServer.subscribers("topics:matrix")
 
-    assert result == :ok
-    assert length(pids) == 1
+    [subscriber] = subscribers
+    channel_pid = socket.channel_pid
+
+    assert length(subscribers) == 1
+    assert %{channel_pid: ^channel_pid, topic_client_worker_pid: _} = subscriber
   end
 
   test "client should publish an event to topics:matrix and receive it" do
@@ -22,10 +25,6 @@ defmodule DPSWeb.TopicChanelTest do
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
 
     ref = push(socket, "publish", ["event", %{"message" => "red pill or blue pill?"}])
-
-    pids = TopicServer.pids("topics:matrix")
-
-    assert length(pids) == 1
 
     assert_reply ref, :ok
 
@@ -38,7 +37,7 @@ defmodule DPSWeb.TopicChanelTest do
     }
   end
 
-  test "multiple clients should receive the event" do
+  test "multiple subscribers should receive the event" do
     {:ok, _, socket1} =
       DPSWeb.Socket
       |> socket("user:1", %{})
@@ -49,23 +48,66 @@ defmodule DPSWeb.TopicChanelTest do
       |> socket("user:2", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
 
-    push(socket1, "publish", ["event", %{"message" => "red pill or blue pill?"}])
+    subscribers = TopicServer.subscribers("topics:matrix")
 
-    pids = TopicServer.pids("topics:matrix")
+    assert length(subscribers) == 2
 
-    # same topic client for both sockets
-    assert length(pids) == 1
+    ref = push(socket1, "publish", ["event", %{"message" => "red pill or blue pill?"}])
 
-    assert_receive %Phoenix.Socket.Message{
-      topic: "topics:matrix",
-      event: "event",
-      payload: %{"message" => "red pill or blue pill?"}
-    }
+    assert_reply ref, :ok
 
     assert_receive %Phoenix.Socket.Message{
       topic: "topics:matrix",
       event: "event",
       payload: %{"message" => "red pill or blue pill?"}
     }
+
+    assert_receive %Phoenix.Socket.Message{
+      topic: "topics:matrix",
+      event: "event",
+      payload: %{"message" => "red pill or blue pill?"}
+    }
+  end
+
+  test "subscribers should unsubscribe" do
+    {:ok, _, socket1} =
+      DPSWeb.Socket
+      |> socket("user:1", %{})
+      |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
+
+    {:ok, _, socket2} =
+      DPSWeb.Socket
+      |> socket("user:2", %{})
+      |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
+
+    Process.monitor(socket1.channel_pid)
+    Process.unlink(socket1.channel_pid)
+    Process.monitor(socket2.channel_pid)
+    Process.unlink(socket2.channel_pid)
+
+    subscribers = TopicServer.subscribers("topics:matrix")
+
+    assert length(subscribers) == 2
+
+    # unsubscribe first one
+    pid = leave(socket1)
+
+    assert_receive {:DOWN, _, _, _, {:shutdown, :left}}
+
+    subscribers = TopicServer.subscribers("topics:matrix")
+    [subscriber] = subscribers
+    channel_pid = socket2.channel_pid
+
+    assert length(subscribers) == 1
+    assert %{channel_pid: ^channel_pid, topic_client_worker_pid: _} = subscriber
+
+    # unsubscribe second one
+    pid = leave(socket2)
+
+    assert_receive {:DOWN, _, _, _, {:shutdown, :left}}
+
+    subscribers = TopicServer.subscribers("topics:matrix")
+
+    assert length(subscribers) == 0
   end
 end
