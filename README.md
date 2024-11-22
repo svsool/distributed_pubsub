@@ -76,7 +76,7 @@ DPS_PORT=4001 DPS_APP=ws iex --sname dps-b -S mix phx.server
 
 # start topic servers
 DPS_APP=ts iex --sname dps-ts-a -S mix
-    DPS_APP=ts iex --sname dps-ts-b -S mix
+DPS_APP=ts iex --sname dps-ts-b -S mix
 ```
 
 Ring is static for demonstration purpose, and can be adjusted in [config/dev.exs](./config/dev.exs) given cluster changes.
@@ -89,11 +89,12 @@ websocat "ws://127.0.0.1:4000/socket/websocket?vsn=2.0.0"
 ["1", "1", "topics:matrix", "phx_join", {}]
 
 # terminal 2
-    websocat "ws://127.0.0.1:4000/socket/websocket?vsn=2.0.0"
+websocat "ws://127.0.0.1:4001/socket/websocket?vsn=2.0.0"
 ["1", "1", "topics:matrix", "phx_join", {}]
 ["1", "1", "topics:matrix", "publish", ["event", { "message": "red pill or blue pill?"}]]
 
-# => a new message should appear in the `terminal 1`
+# => the following message should appear in the `terminal 1`
+["1",null,"topics:matrix","event",{"message":"red pill or blue pill?"}]
 ```
 
 ## Commands 
