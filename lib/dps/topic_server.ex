@@ -110,7 +110,7 @@ defmodule DPS.TopicServer do
   def handle_call({:publish, event, payload}, _from, state) do
     start = System.monotonic_time(:millisecond)
 
-    for %{topic_client_worker_pid: topic_client_worker_pid} <- state.subscribers do
+    for {topic_client_worker_pid, _subscribers} <- group_subscribers(state.subscribers) do
       :ok = GenServer.call(topic_client_worker_pid, {:publish, state.topic, event, payload})
     end
 
@@ -155,6 +155,10 @@ defmodule DPS.TopicServer do
              channel_pid == pid
            end)
      }}
+  end
+
+  defp group_subscribers(subscribers) do
+    Enum.group_by(subscribers, & &1.topic_client_worker_pid)
   end
 end
 

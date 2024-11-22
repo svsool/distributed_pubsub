@@ -18,11 +18,13 @@ defmodule DPSWeb.TopicChanelTest do
     assert %{channel_pid: ^channel_pid, topic_client_worker_pid: _} = subscriber
   end
 
-  test "client should publish an event to topics:matrix and receive it" do
+  test "client should publish an event to topics:matrix and receive it exactly once" do
     {:ok, _, socket} =
       DPSWeb.Socket
       |> socket("user:1", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
+
+    socket_join_ref = socket.join_ref
 
     ref = push(socket, "publish", ["event", %{"message" => "red pill or blue pill?"}])
 
@@ -33,20 +35,31 @@ defmodule DPSWeb.TopicChanelTest do
     assert_receive %Phoenix.Socket.Message{
       topic: "topics:matrix",
       event: "event",
-      payload: %{"message" => "red pill or blue pill?"}
+      payload: %{"message" => "red pill or blue pill?"},
+      join_ref: ^socket_join_ref
+    }
+
+    refute_receive %Phoenix.Socket.Message{
+      topic: "topics:matrix",
+      event: "event",
+      payload: %{"message" => "red pill or blue pill?"},
+      join_ref: ^socket_join_ref
     }
   end
 
-  test "multiple subscribers should receive the event" do
+  test "multiple subscribers should receive an event exactly once" do
     {:ok, _, socket1} =
       DPSWeb.Socket
       |> socket("user:1", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
 
-    {:ok, _, _socket2} =
+    {:ok, _, socket2} =
       DPSWeb.Socket
       |> socket("user:2", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
+
+    socket1_join_ref = socket1.join_ref
+    socket2_join_ref = socket2.join_ref
 
     subscribers = TopicServer.subscribers("topics:matrix")
 
@@ -59,13 +72,31 @@ defmodule DPSWeb.TopicChanelTest do
     assert_receive %Phoenix.Socket.Message{
       topic: "topics:matrix",
       event: "event",
-      payload: %{"message" => "red pill or blue pill?"}
+      payload: %{"message" => "red pill or blue pill?"},
+      join_ref: ^socket1_join_ref
     }
 
     assert_receive %Phoenix.Socket.Message{
       topic: "topics:matrix",
       event: "event",
-      payload: %{"message" => "red pill or blue pill?"}
+      payload: %{"message" => "red pill or blue pill?"},
+      join_ref: ^socket2_join_ref
+    }
+
+    # there should be no duplicate messages received
+
+    refute_receive %Phoenix.Socket.Message{
+      topic: "topics:matrix",
+      event: "event",
+      payload: %{"message" => "red pill or blue pill?"},
+      join_ref: ^socket1_join_ref
+    }
+
+    refute_receive %Phoenix.Socket.Message{
+      topic: "topics:matrix",
+      event: "event",
+      payload: %{"message" => "red pill or blue pill?"},
+      join_ref: ^socket2_join_ref
     }
   end
 
