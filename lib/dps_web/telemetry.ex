@@ -3,18 +3,13 @@ defmodule DPSWeb.Telemetry.Logger do
 
   require Logger
 
+  @spec start_link(Keyword.t()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   @impl true
   def init(opts) do
-    :ok = init_telemetry()
-
-    {:ok, opts}
-  end
-
-  def init_telemetry do
     :telemetry.attach_many(
       __MODULE__,
       [
@@ -34,8 +29,11 @@ defmodule DPSWeb.Telemetry.Logger do
       &handle_event/4,
       nil
     )
+
+    {:ok, opts}
   end
 
+  @spec format_measurements(map()) :: map()
   def format_measurements(measurements) do
     duration = Map.get(measurements, :duration, nil)
 
@@ -46,6 +44,12 @@ defmodule DPSWeb.Telemetry.Logger do
     end
   end
 
+  @spec handle_event(
+          atom(),
+          map(),
+          map(),
+          map()
+        ) :: :ok
   def handle_event(
         event,
         measurements,
@@ -75,6 +79,7 @@ defmodule DPSWeb.Telemetry do
     )
   end
 
+  @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
     [
       # Phoenix Metrics

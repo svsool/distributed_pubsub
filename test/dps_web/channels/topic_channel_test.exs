@@ -43,7 +43,7 @@ defmodule DPSWeb.TopicChanelTest do
       |> socket("user:1", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
 
-    {:ok, _, socket2} =
+    {:ok, _, _socket2} =
       DPSWeb.Socket
       |> socket("user:2", %{})
       |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix")
@@ -90,7 +90,7 @@ defmodule DPSWeb.TopicChanelTest do
     assert length(subscribers) == 2
 
     # unsubscribe first one
-    pid = leave(socket1)
+    leave(socket1)
 
     assert_receive {:DOWN, _, _, _, {:shutdown, :left}}
 
@@ -102,12 +102,12 @@ defmodule DPSWeb.TopicChanelTest do
     assert %{channel_pid: ^channel_pid, topic_client_worker_pid: _} = subscriber
 
     # unsubscribe second one
-    pid = leave(socket2)
+    leave(socket2)
 
     assert_receive {:DOWN, _, _, _, {:shutdown, :left}}
 
     subscribers = TopicServer.subscribers("topics:matrix")
 
-    assert length(subscribers) == 0
+    assert Enum.empty?(subscribers)
   end
 end

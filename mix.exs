@@ -9,7 +9,8 @@ defmodule DPS.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      dialyzer: dialyzer()
     ]
   end
 
@@ -34,13 +35,25 @@ defmodule DPS.MixProject do
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
       {:libcluster, "~> 3.4.1"},
-      {:ex_hash_ring, "~> 6.0"}
+      {:ex_hash_ring, "~> 6.0"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
   defp aliases do
     [
-      setup: ["deps.get"]
+      setup: ["deps.get"],
+      quality: ["compile --warnings-as-errors", "format", "credo --strict", "dialyzer"]
+    ]
+  end
+
+  defp dialyzer() do
+    plt_core_path = "_build/#{Mix.env()}"
+
+    [
+      plt_core_path: plt_core_path,
+      plt_file: {:no_warn, "#{plt_core_path}/dialyzer.plt"}
     ]
   end
 end

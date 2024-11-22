@@ -5,14 +5,17 @@ defmodule DPS.TopicServer.Utils do
 
   @group "topic_servers"
 
+  @spec shards_number() :: non_neg_integer()
   def shards_number, do: Application.get_env(:dps, DPS.TopicServer)[:shards_number]
 
+  @spec resolve_topic_server_worker_pid(binary()) :: {:ok, pid()} | :error
   def resolve_topic_server_worker_pid(topic) do
     {:ok, node_name} = Ring.find_node(DPS.Ring, topic)
 
     members = :pg.get_members(DPS.PG, @group)
 
-    topic_server_worker_pids = members |> Enum.filter(&(node(&1) == node_name))
+    topic_server_worker_pids =
+      members |> Enum.filter(&(to_string(node(&1)) == node_name))
 
     if length(topic_server_worker_pids) > 0 do
       pid_index =
@@ -35,6 +38,7 @@ defmodule DPS.TopicServer.Utils do
     end
   end
 
+  @spec join(pid()) :: :ok
   def join(pid) do
     :ok = :pg.join(DPS.PG, @group, pid)
   end
@@ -45,6 +49,7 @@ defmodule DPS.TopicServer do
 
   import DPS.TopicServer.Utils
 
+  @spec verify_opts!(Keyword.t()) :: :ok
   def verify_opts!(opts) do
     if opts[:topic] == nil do
       raise ArgumentError, "Topic is required"
@@ -64,16 +69,19 @@ defmodule DPS.TopicServer do
     )
   end
 
+  @spec subscribers(binary()) :: :ok
   def subscribers(topic) do
     {:ok, topic_server_pid} = resolve_topic_server_worker_pid(topic)
 
     GenServer.call(topic_server_pid, {:subscribers, topic})
   end
 
+  @impl true
   def init(state) do
     {:ok, state}
   end
 
+  @impl true
   def handle_call({:join, channel_pid, topic_client_worker_pid}, _from, state) do
     :telemetry.execute(
       [:dps, :topic_server, :join],
@@ -98,6 +106,7 @@ defmodule DPS.TopicServer do
      }}
   end
 
+  @impl true
   def handle_call({:publish, event, payload}, _from, state) do
     start = System.monotonic_time(:millisecond)
 
@@ -121,10 +130,12 @@ defmodule DPS.TopicServer do
     {:reply, :ok, state}
   end
 
+  @impl true
   def handle_call(:subscribers, _from, state) do
     {:reply, MapSet.to_list(state.subscribers), state}
   end
 
+  @impl true
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
     :telemetry.execute(
       [:dps, :topic_server, :leave],
@@ -153,11 +164,11 @@ defmodule DPS.TopicServer.Supervisor do
   import DPS.TopicServer.Utils
 
   def start_link(opts) do
-    Supervisor.start_link(__MODULE__, %{}, name: __MODULE__)
+    Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   @impl true
-  def init(opts) do
+  def init(_opts) do
     children =
       for shard <- 0..(shards_number() - 1) do
         Supervisor.child_spec({DPS.TopicServer.Worker, [shard: shard]},
@@ -175,17 +186,19 @@ defmodule DPS.TopicServer.Worker do
 
   import DPS.TopicServer.Utils
 
+  @spec start_link(Keyword.t()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, [], name: :"DPS.TopicServer.Worker.#{opts[:shard]}")
+    GenServer.start_link(__MODULE__, opts, name: :"DPS.TopicServer.Worker.#{opts[:shard]}")
   end
 
   @impl true
-  def init(opts) do
+  def init(_opts) do
     :ok = join(self())
 
     {:ok, %{}}
   end
 
+  @spec ensure_topic_server_started(atom()) :: pid()
   def ensure_topic_server_started(topic) do
     case GenServer.whereis(:"DPS.TopicServer.#{topic}") do
       nil ->

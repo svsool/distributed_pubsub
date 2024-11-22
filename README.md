@@ -1,5 +1,6 @@
 # Distributed PubSub
 
+
 This is a proof-of-concept implementation of Distributed PubSub using [Distributed Process Group](https://www.erlang.org/doc/apps/kernel/pg.html), [GenServer](https://hexdocs.pm/elixir/GenServer.html), [Consistent Hash Ring](https://github.com/discord/ex_hash_ring) and [Channels](https://hexdocs.pm/phoenix/channels.html). An essential component of message delivery in any chat application
 
 Ring used to determine Topic's Node, subscribe to Topic's GenServer, and fan out messages to subscribers from there.
@@ -75,7 +76,7 @@ DPS_PORT=4001 DPS_APP=ws iex --sname dps-b -S mix phx.server
 
 # start topic servers
 DPS_APP=ts iex --sname dps-ts-a -S mix
-DPS_APP=ts iex --sname dps-ts-b -S mix
+    DPS_APP=ts iex --sname dps-ts-b -S mix
 ```
 
 Ring is static for demonstration purpose, and can be adjusted in [config/dev.exs](./config/dev.exs) given cluster changes.
@@ -88,7 +89,7 @@ websocat "ws://127.0.0.1:4000/socket/websocket?vsn=2.0.0"
 ["1", "1", "topics:matrix", "phx_join", {}]
 
 # terminal 2
-websocat "ws://127.0.0.1:4000/socket/websocket?vsn=2.0.0"
+    websocat "ws://127.0.0.1:4000/socket/websocket?vsn=2.0.0"
 ["1", "1", "topics:matrix", "phx_join", {}]
 ["1", "1", "topics:matrix", "publish", ["event", { "message": "red pill or blue pill?"}]]
 

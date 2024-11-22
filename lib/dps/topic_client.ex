@@ -1,8 +1,10 @@
 defmodule DPS.TopicClient.Utils do
   @moduledoc false
 
+  @spec shards_number() :: non_neg_integer()
   def shards_number, do: Application.get_env(:dps, DPS.TopicClient)[:shards_number]
 
+  @spec resolve_topic_client_worker_pid(binary()) :: pid()
   def resolve_topic_client_worker_pid(topic) do
     shard = :erlang.phash2(topic, shards_number())
 
@@ -15,12 +17,13 @@ defmodule DPS.TopicClient.Supervisor do
 
   import DPS.TopicClient.Utils
 
+  @spec start_link(Keyword.t()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
-    Supervisor.start_link(__MODULE__, %{}, name: __MODULE__)
+    Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   @impl true
-  def init(opts) do
+  def init(_opts) do
     children =
       for shard <- 0..(shards_number() - 1) do
         Supervisor.child_spec({DPS.TopicClient.Worker, [shard: shard]},
@@ -36,12 +39,13 @@ defmodule DPS.TopicClient.Worker do
   @moduledoc false
   use GenServer
 
+  @spec start_link(Keyword.t()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, [], name: :"DPS.TopicClient.Worker.#{opts[:shard]}")
+    GenServer.start_link(__MODULE__, opts, name: :"DPS.TopicClient.Worker.#{opts[:shard]}")
   end
 
   @impl true
-  def init(opts) do
+  def init(_opts) do
     {:ok, %{}}
   end
 
