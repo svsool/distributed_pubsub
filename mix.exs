@@ -36,6 +36,7 @@ defmodule DPS.MixProject do
       {:bandit, "~> 1.5"},
       {:libcluster, "~> 3.4.1"},
       {:ex_hash_ring, "~> 6.0"},
+      {:manifold, "~> 1.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]

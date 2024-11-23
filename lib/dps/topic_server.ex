@@ -82,14 +82,13 @@ defmodule DPS.TopicServer do
   end
 
   @impl true
-  def handle_call({:join, channel_pid, topic_client_worker_pid}, _from, state) do
+  def handle_call({:join, channel_pid}, _from, state) do
     :telemetry.execute(
       [:dps, :topic_server, :join],
       %{},
       %{
         topic: state.topic,
-        channel_pid: channel_pid,
-        topic_client_worker_pid: topic_client_worker_pid
+        channel_pid: channel_pid
       }
     )
 
@@ -100,8 +99,7 @@ defmodule DPS.TopicServer do
        state
        | subscribers:
            MapSet.put(state.subscribers, %{
-             channel_pid: channel_pid,
-             topic_client_worker_pid: topic_client_worker_pid
+             channel_pid: channel_pid
            })
      }}
   end
@@ -110,9 +108,8 @@ defmodule DPS.TopicServer do
   def handle_call({:publish, event, payload}, _from, state) do
     start = System.monotonic_time(:millisecond)
 
-    for {topic_client_worker_pid, _subscribers} <- group_subscribers(state.subscribers) do
-      :ok = GenServer.call(topic_client_worker_pid, {:publish, state.topic, event, payload})
-    end
+    # publish message to all subscribers grouped by their according node for traffic reduction
+    Manifold.send(Enum.map(state.subscribers, & &1.channel_pid), {:publish, state.topic, event, payload})
 
     duration = System.monotonic_time(:millisecond) - start
 
@@ -155,10 +152,6 @@ defmodule DPS.TopicServer do
              channel_pid == pid
            end)
      }}
-  end
-
-  defp group_subscribers(subscribers) do
-    Enum.group_by(subscribers, & &1.topic_client_worker_pid)
   end
 end
 
@@ -227,10 +220,10 @@ defmodule DPS.TopicServer.Worker do
   end
 
   @impl true
-  def handle_call({:join, topic, channel_pid, topic_client_worker_pid}, _from, state) do
+  def handle_call({:join, topic, channel_pid}, _from, state) do
     topic_server_pid = ensure_topic_server_started(topic)
 
-    result = GenServer.call(topic_server_pid, {:join, channel_pid, topic_client_worker_pid})
+    result = GenServer.call(topic_server_pid, {:join, channel_pid})
 
     {:reply, result, state}
   end

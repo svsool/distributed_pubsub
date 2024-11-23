@@ -93,7 +93,7 @@ websocat "ws://127.0.0.1:4001/socket/websocket?vsn=2.0.0"
 ["1", "1", "topics:matrix", "phx_join", {}]
 ["1", "1", "topics:matrix", "publish", ["event", { "message": "red pill or blue pill?"}]]
 
-# => the following message should appear in the `terminal 1`
+# => the following message should appear in both terminals 
 ["1",null,"topics:matrix","event",{"message":"red pill or blue pill?"}]
 ```
 

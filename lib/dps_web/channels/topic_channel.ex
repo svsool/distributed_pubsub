@@ -1,14 +1,12 @@
 defmodule DPSWeb.TopicChannel do
   use Phoenix.Channel, log_join: false, log_handle_in: false
 
-  import DPS.TopicClient.Utils
   import DPS.TopicServer.Utils
 
   intercept ["event"]
 
   @impl true
   def join(topic, payload, socket) do
-    topic_client_worker_pid = resolve_topic_client_worker_pid(topic)
     {:ok, topic_server_worker_pid} = resolve_topic_server_worker_pid(topic)
 
     start = System.monotonic_time()
@@ -18,7 +16,7 @@ defmodule DPSWeb.TopicChannel do
     :ok =
       GenServer.call(
         topic_server_worker_pid,
-        {:join, topic, topic_channel_pid, topic_client_worker_pid}
+        {:join, topic, topic_channel_pid}
       )
 
     duration = System.monotonic_time() - start
@@ -31,7 +29,6 @@ defmodule DPSWeb.TopicChannel do
         topic: topic,
         payload: payload,
         topic_channel_pid: topic_channel_pid,
-        topic_client_worker_pid: topic_client_worker_pid,
         topic_server_worker_pid: topic_server_worker_pid
       }
     )
@@ -62,6 +59,27 @@ defmodule DPSWeb.TopicChannel do
     )
 
     {:reply, :ok, socket}
+  end
+
+  @impl true
+  def handle_info({:publish, topic, event, payload}, socket) do
+    start = System.monotonic_time()
+
+    push(socket, event, payload)
+
+    duration = System.monotonic_time() - start
+
+    :telemetry.execute(
+      [:dps, :topic_client, :publish],
+      %{duration: duration},
+      %{
+        topic: topic,
+        event: event,
+        payload: payload
+      }
+    )
+
+    {:noreply, socket}
   end
 
   @impl true

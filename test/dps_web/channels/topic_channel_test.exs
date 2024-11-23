@@ -15,7 +15,7 @@ defmodule DPSWeb.TopicChanelTest do
     channel_pid = socket.channel_pid
 
     assert length(subscribers) == 1
-    assert %{channel_pid: ^channel_pid, topic_client_worker_pid: _} = subscriber
+    assert %{channel_pid: ^channel_pid} = subscriber
   end
 
   test "client should publish an event to topics:matrix and receive it exactly once" do
@@ -29,8 +29,6 @@ defmodule DPSWeb.TopicChanelTest do
     ref = push(socket, "publish", ["event", %{"message" => "red pill or blue pill?"}])
 
     assert_reply ref, :ok
-
-    assert_broadcast "event", %{"message" => "red pill or blue pill?"}
 
     assert_receive %Phoenix.Socket.Message{
       topic: "topics:matrix",
@@ -130,7 +128,7 @@ defmodule DPSWeb.TopicChanelTest do
     channel_pid = socket2.channel_pid
 
     assert length(subscribers) == 1
-    assert %{channel_pid: ^channel_pid, topic_client_worker_pid: _} = subscriber
+    assert %{channel_pid: ^channel_pid} = subscriber
 
     # unsubscribe second one
     leave(socket2)
