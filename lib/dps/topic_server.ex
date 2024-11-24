@@ -17,7 +17,7 @@ defmodule DPS.TopicServer do
       __MODULE__,
       %{
         topic: opts[:topic],
-        subscribers: MapSet.new()
+        subscribers: []
       },
       name: :"DPS.TopicServer.#{opts[:topic]}",
       hibernate_after: 15_000
@@ -37,26 +37,27 @@ defmodule DPS.TopicServer do
   end
 
   @impl true
-  def handle_call({:join, channel_pid}, _from, state) do
-    :telemetry.execute(
-      [:dps, :topic_server, :join],
-      %{},
-      %{
-        topic: state.topic,
-        channel_pid: channel_pid
-      }
-    )
+  def handle_call({:join, subscriber_pid}, _from, state) do
+    if Enum.member?(state.subscribers, subscriber_pid) do
+      {:reply, :ok, state}
+    else
+      :telemetry.execute(
+        [:dps, :topic_server, :join],
+        %{},
+        %{
+          topic: state.topic,
+          subscriber_pid: subscriber_pid
+        }
+      )
 
-    Process.monitor(channel_pid)
+      Process.monitor(subscriber_pid)
 
-    {:reply, :ok,
-     %{
-       state
-       | subscribers:
-           MapSet.put(state.subscribers, %{
-             channel_pid: channel_pid
-           })
-     }}
+      {:reply, :ok,
+       %{
+         state
+         | subscribers: [subscriber_pid | state.subscribers]
+       }}
+    end
   end
 
   @impl true
@@ -65,7 +66,7 @@ defmodule DPS.TopicServer do
 
     # publish message to all subscribers grouped by their according node for traffic reduction
     Manifold.send(
-      Enum.map(state.subscribers, & &1.channel_pid),
+      state.subscribers,
       {:publish, state.topic, event, payload}
     )
 
@@ -87,7 +88,7 @@ defmodule DPS.TopicServer do
 
   @impl true
   def handle_call(:subscribers, _from, state) do
-    {:reply, MapSet.to_list(state.subscribers), state}
+    {:reply, state.subscribers, state}
   end
 
   @impl true
@@ -106,8 +107,8 @@ defmodule DPS.TopicServer do
      %{
        state
        | subscribers:
-           MapSet.reject(state.subscribers, fn %{channel_pid: channel_pid} ->
-             channel_pid == pid
+           Enum.reject(state.subscribers, fn subscriber_pid ->
+             subscriber_pid == pid
            end)
      }}
   end
@@ -116,6 +117,7 @@ end
 defmodule DPS.TopicServer.Worker.Supervisor do
   use Supervisor
 
+  @spec shards_number() :: non_neg_integer()
   def shards_number, do: Application.get_env(:dps, DPS.TopicServer.Worker)[:shards_number]
 
   def start_link(opts) do
@@ -136,7 +138,6 @@ defmodule DPS.TopicServer.Worker.Supervisor do
 end
 
 defmodule DPS.TopicServer.Worker do
-  @moduledoc false
   use GenServer
 
   import DPS.TopicRouter
@@ -181,10 +182,10 @@ defmodule DPS.TopicServer.Worker do
   end
 
   @impl true
-  def handle_call({:join, topic, channel_pid}, _from, state) do
+  def handle_call({:join, topic, subscriber_pid}, _from, state) do
     topic_server_pid = ensure_topic_server_started(topic)
 
-    result = GenServer.call(topic_server_pid, {:join, channel_pid})
+    result = GenServer.call(topic_server_pid, {:join, subscriber_pid})
 
     {:reply, result, state}
   end

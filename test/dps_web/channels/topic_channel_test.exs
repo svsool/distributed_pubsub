@@ -15,7 +15,7 @@ defmodule DPSWeb.TopicChanelTest do
     channel_pid = socket.channel_pid
 
     assert length(subscribers) == 1
-    assert %{channel_pid: ^channel_pid} = subscriber
+    assert ^channel_pid = subscriber
   end
 
   test "client should publish an event to topics:matrix and receive it exactly once" do
@@ -128,7 +128,7 @@ defmodule DPSWeb.TopicChanelTest do
     channel_pid = socket2.channel_pid
 
     assert length(subscribers) == 1
-    assert %{channel_pid: ^channel_pid} = subscriber
+    assert ^channel_pid = subscriber
 
     # unsubscribe second one
     leave(socket2)
