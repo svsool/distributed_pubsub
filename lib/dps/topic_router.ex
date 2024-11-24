@@ -29,6 +29,4 @@ defmodule DPS.TopicRouter do
       {:error}
     end
   end
-
-
 end
