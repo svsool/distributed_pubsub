@@ -7,25 +7,19 @@
 # General application configuration
 import Config
 
-schedulers_online = System.schedulers_online()
-
 config :dps,
   env: config_env(),
   namespace: DPS,
   generators: [timestamp_type: :utc_datetime]
 
-config :dps, DPS.TopicClient,
+config :dps, DPS.TopicServer.Worker,
   # should be same across whole fleet
-  shards_number: schedulers_online
-
-config :dps, DPS.TopicServer,
-  # should be same across whole fleet
-  shards_number: schedulers_online
+  shards_number: System.schedulers_online()
 
 # Configures the endpoint
 config :dps, DPSWeb.Endpoint,
   url: [host: "localhost"],
-  adapter: Bandit.PhoenixAdapter,
+  adapter: Phoenix.Endpoint.Cowboy2Adapter,
   render_errors: [
     formats: [json: DPSWeb.ErrorJSON],
     layout: false

@@ -1,53 +1,7 @@
-defmodule DPS.TopicServer.Utils do
-  @moduledoc false
-
-  alias ExHashRing.Ring
-
-  @group "topic_servers"
-
-  @spec shards_number() :: non_neg_integer()
-  def shards_number, do: Application.get_env(:dps, DPS.TopicServer)[:shards_number]
-
-  @spec resolve_topic_server_worker_pid(binary()) :: {:ok, pid()} | :error
-  def resolve_topic_server_worker_pid(topic) do
-    {:ok, node_name} = Ring.find_node(DPS.Ring, topic)
-
-    members = :pg.get_members(DPS.PG, @group)
-
-    topic_server_worker_pids =
-      members |> Enum.filter(&(to_string(node(&1)) == node_name))
-
-    if length(topic_server_worker_pids) > 0 do
-      pid_index =
-        case length(topic_server_worker_pids) do
-          1 -> 0
-          len when len > 1 -> :rand.uniform(len - 1)
-        end
-
-      # TODO: do in a round-robin fashion e.g. based on load
-      # route to a random topic server worker for now
-      pid = topic_server_worker_pids |> Enum.at(pid_index)
-
-      if pid == nil do
-        {:error}
-      else
-        {:ok, pid}
-      end
-    else
-      {:error}
-    end
-  end
-
-  @spec join(pid()) :: :ok
-  def join(pid) do
-    :ok = :pg.join(DPS.PG, @group, pid)
-  end
-end
-
 defmodule DPS.TopicServer do
   use GenServer
 
-  import DPS.TopicServer.Utils
+  import DPS.TopicRouter
 
   @spec verify_opts!(Keyword.t()) :: :ok
   def verify_opts!(opts) do
@@ -65,7 +19,8 @@ defmodule DPS.TopicServer do
         topic: opts[:topic],
         subscribers: MapSet.new()
       },
-      name: :"DPS.TopicServer.#{opts[:topic]}"
+      name: :"DPS.TopicServer.#{opts[:topic]}",
+      hibernate_after: 15_000
     )
   end
 
@@ -109,7 +64,10 @@ defmodule DPS.TopicServer do
     start = System.monotonic_time(:millisecond)
 
     # publish message to all subscribers grouped by their according node for traffic reduction
-    Manifold.send(Enum.map(state.subscribers, & &1.channel_pid), {:publish, state.topic, event, payload})
+    Manifold.send(
+      Enum.map(state.subscribers, & &1.channel_pid),
+      {:publish, state.topic, event, payload}
+    )
 
     duration = System.monotonic_time(:millisecond) - start
 
@@ -155,10 +113,10 @@ defmodule DPS.TopicServer do
   end
 end
 
-defmodule DPS.TopicServer.Supervisor do
+defmodule DPS.TopicServer.Worker.Supervisor do
   use Supervisor
 
-  import DPS.TopicServer.Utils
+  def shards_number, do: Application.get_env(:dps, DPS.TopicServer.Worker)[:shards_number]
 
   def start_link(opts) do
     Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
@@ -169,7 +127,7 @@ defmodule DPS.TopicServer.Supervisor do
     children =
       for shard <- 0..(shards_number() - 1) do
         Supervisor.child_spec({DPS.TopicServer.Worker, [shard: shard]},
-          id: "DPS.TopicServer.Supervisor.#{shard}"
+          id: "DPS.TopicServer.Worker.Supervisor.#{shard}"
         )
       end
 
@@ -181,16 +139,19 @@ defmodule DPS.TopicServer.Worker do
   @moduledoc false
   use GenServer
 
-  import DPS.TopicServer.Utils
+  import DPS.TopicRouter
 
   @spec start_link(Keyword.t()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: :"DPS.TopicServer.Worker.#{opts[:shard]}")
+    GenServer.start_link(__MODULE__, opts,
+      name: :"DPS.TopicServer.Worker.#{opts[:shard]}",
+      hibernate_after: 15_000
+    )
   end
 
   @impl true
   def init(_opts) do
-    :ok = join(self())
+    :ok = join_process_group(self())
 
     {:ok, %{}}
   end
@@ -228,7 +189,6 @@ defmodule DPS.TopicServer.Worker do
     {:reply, result, state}
   end
 
-  # send() can be used as well for perf reasons to avoid GenServer overhead
   @impl true
   def handle_call({:publish, topic, event, payload}, _from, state) do
     topic_server_pid = ensure_topic_server_started(topic)

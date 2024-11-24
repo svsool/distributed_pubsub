@@ -3,7 +3,7 @@ import Config
 config :dps, DPSWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4000],
   check_origin: false,
-  code_reloader: true,
+  code_reloader: false,
   debug_errors: true,
   secret_key_base: "/C2+I8FuGmAHq+MfX1wGFmmBhDavp6xhBDD7W2rx1vzSYVWjsc+Qow54KOp+Z2eL",
   watchers: []
