@@ -4,6 +4,8 @@ This is a proof-of-concept implementation of Distributed PubSub using [Distribut
 
 [Ring](https://github.com/discord/ex_hash_ring) used to determine Topic's Node, subscribe to Topic's GenServer, and fan out messages to subscribers, subscriber PIDs are grouped by their remote node to reduce number of `send/2` calls.
 
+Direct message publishing helps mitigate the [Bandwidth Bisection](https://en.wikipedia.org/wiki/Bisection_bandwidth) problem, which the default broadcast [PubSub Adapter](https://github.com/phoenixframework/phoenix_pubsub) is more prone to, since number of messages grows quadratically with the number of nodes in the cluster when using broadcast.
+
 Topic is roughly equivalent to a Guild mentioned in [How Discord Scaled Elixir to 5,000,000 Concurrent Users](https://discord.com/blog/how-discord-scaled-elixir-to-5-000-000-concurrent-users).
 
 **NB** Production ready system would involve dynamic topology management, replication, netsplit recovery, stricter delivery semantics, message queueing, [overload protection](https://ferd.ca/handling-overload.html) and other things.
@@ -110,7 +112,7 @@ mix quality
 ## Resources
 
 - [How Discord Scaled Elixir to 5,000,000 Concurrent Users](https://discord.com/blog/how-discord-scaled-elixir-to-5-000-000-concurrent-users)
-- [How Discord Serves 15,000,000 Users on One Server](https://blog.bytebytego.com/p/how-discord-serves-15-million-users)
+- [Pushing Discord’s Limits with a Million+ Online Users in a Single Server](https://discord.com/blog/maxjourney-pushing-discords-limits-with-a-million-plus-online-users-in-a-single-server)
 - [How WhatsApp Scaled Erlang Cluster to 10000 Nodes](https://www.youtube.com/watch?v=FJQyv26tFZ8)
 - [RPC in WhatsApp with 40000+ Nodes](https://www.youtube.com/watch?v=A5bLRH-PoMY)
 
