@@ -37,6 +37,8 @@ defmodule DPS.MixProject do
       {:libcluster, "~> 3.4.1"},
       {:ex_hash_ring, "~> 6.0"},
       {:manifold, "~> 1.5"},
+      {:plug_cowboy, "~> 2.5"},
+      {:socket_drano, "~> 0.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]

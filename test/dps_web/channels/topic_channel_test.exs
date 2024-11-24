@@ -139,4 +139,24 @@ defmodule DPSWeb.TopicChanelTest do
 
     assert Enum.empty?(subscribers)
   end
+
+  test "client should receive an error if topic name is invalid" do
+    assert {:error, "invalid topic name" <> _} =
+             DPSWeb.Socket
+             |> socket("user:1", %{})
+             # short topic name
+             |> subscribe_and_join(DPSWeb.TopicChannel, "topics:s")
+
+    assert {:error, "invalid topic name" <> _} =
+             DPSWeb.Socket
+             |> socket("user:1", %{})
+             # long topic name
+             |> subscribe_and_join(DPSWeb.TopicChannel, "topics:s#{String.duplicate("a", 64)}")
+
+    assert {:error, "invalid topic name" <> _} =
+             DPSWeb.Socket
+             |> socket("user:1", %{})
+             # non-alphanumeric topic name
+             |> subscribe_and_join(DPSWeb.TopicChannel, "topics:matrix%$#")
+  end
 end

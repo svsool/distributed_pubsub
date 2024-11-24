@@ -1,6 +1,4 @@
 defmodule DPSWeb do
-  @moduledoc false
-
   @spec channel :: tuple()
   def channel do
     quote do

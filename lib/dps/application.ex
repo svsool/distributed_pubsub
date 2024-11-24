@@ -1,6 +1,4 @@
 defmodule DPS.Application do
-  @moduledoc false
-
   use Application
 
   @impl true
@@ -27,6 +25,8 @@ defmodule DPS.Application do
       {ExHashRing.Ring, name: DPS.Ring, nodes: resolve_nodes()},
       {Cluster.Supervisor,
        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
+      # drains 25% of connections every 100ms by default, can be adjusted if needed
+      {SocketDrano, refs: :all},
       {Phoenix.PubSub, name: DPS.PubSub},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
       DPSWeb.Endpoint
@@ -36,7 +36,7 @@ defmodule DPS.Application do
 
     {:ok, _pid} = result = Supervisor.start_link(children, opts)
 
-    DPS.TopicServer.Utils.join(self())
+    DPS.TopicRouter.join_process_group(self())
 
     result
   end
@@ -50,7 +50,7 @@ defmodule DPS.Application do
       {Cluster.Supervisor,
        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
-      DPS.TopicServer.Supervisor
+      DPS.TopicServer.Worker.Supervisor
     ]
 
     opts = [strategy: :one_for_one, name: DPS.Supervisor]
@@ -68,9 +68,11 @@ defmodule DPS.Application do
       {ExHashRing.Ring, name: DPS.Ring, nodes: resolve_nodes()},
       {Cluster.Supervisor,
        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
+      # drains 25% of connections every 100ms by default, can be adjusted if needed
+      {SocketDrano, refs: :all},
       {Phoenix.PubSub, name: DPS.PubSub},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
-      DPS.TopicServer.Supervisor,
+      DPS.TopicServer.Worker.Supervisor,
       DPSWeb.Endpoint
     ]
 
