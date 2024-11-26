@@ -50,6 +50,7 @@ defmodule DPS.Application do
       {Cluster.Supervisor,
        [Application.get_env(:libcluster, :topologies) || [], [name: DPS.ClusterSupervisor]]},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
+      {Registry, keys: :unique, name: DPS.TopicRegistry},
       DPS.TopicServer.Worker.Supervisor
     ]
 
@@ -71,6 +72,7 @@ defmodule DPS.Application do
       # drains 25% of connections every 100ms by default, can be adjusted if needed
       {SocketDrano, refs: :all},
       {Phoenix.PubSub, name: DPS.PubSub},
+      {Registry, keys: :unique, name: DPS.TopicRegistry},
       {DynamicSupervisor, name: DPS.TopicServer.DynamicSupervisor, strategy: :one_for_one},
       DPS.TopicServer.Worker.Supervisor,
       DPSWeb.Endpoint
