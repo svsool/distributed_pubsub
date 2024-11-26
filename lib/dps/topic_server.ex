@@ -5,12 +5,16 @@ defmodule DPS.TopicServer do
 
   @spec verify_opts!(Keyword.t()) :: :ok
   def verify_opts!(opts) do
+    if opts[:name] == nil do
+      raise ArgumentError, "Name is required"
+    end
+
     if opts[:topic] == nil do
       raise ArgumentError, "Topic is required"
     end
   end
 
-  def start_link(opts \\ []) do
+  def start_link(opts) do
     verify_opts!(opts)
 
     GenServer.start_link(
@@ -19,7 +23,7 @@ defmodule DPS.TopicServer do
         topic: opts[:topic],
         subscribers: []
       },
-      name: :"DPS.TopicServer.#{opts[:topic]}",
+      name: opts[:name],
       hibernate_after: 15_000
     )
   end
@@ -145,7 +149,6 @@ defmodule DPS.TopicServer.Worker do
   @spec start_link(Keyword.t()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts,
-      name: :"DPS.TopicServer.Worker.#{opts[:shard]}",
       hibernate_after: 15_000
     )
   end
@@ -159,12 +162,14 @@ defmodule DPS.TopicServer.Worker do
 
   @spec ensure_topic_server_started(atom()) :: pid()
   def ensure_topic_server_started(topic) do
-    case GenServer.whereis(:"DPS.TopicServer.#{topic}") do
+    name = via_tuple(topic)
+
+    case GenServer.whereis(name) do
       nil ->
         result =
           DynamicSupervisor.start_child(
             DPS.TopicServer.DynamicSupervisor,
-            {DPS.TopicServer, [topic: topic]}
+            {DPS.TopicServer, name: name, topic: topic}
           )
 
         case result do
@@ -206,5 +211,9 @@ defmodule DPS.TopicServer.Worker do
     result = GenServer.call(topic_server_pid, :subscribers)
 
     {:reply, result, state}
+  end
+
+  defp via_tuple(topic) do
+    {:via, Registry, {DPS.TopicRegistry, topic}}
   end
 end
